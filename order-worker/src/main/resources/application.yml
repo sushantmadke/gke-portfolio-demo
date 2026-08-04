@@ -10,8 +10,10 @@ spring:
   cloud:
     gcp:
       project-id: ${GCP_PROJECT_ID:local-dev}
+      # pubsub.emulator-host is intentionally unset here: only define it (e.g. via
+      # PUBSUB_EMULATOR_HOST) when actually running against the local emulator - an
+      # empty-string default makes spring-cloud-gcp try to dial an empty address.
       pubsub:
-        emulator-host: ${PUBSUB_EMULATOR_HOST:}
         subscriber:
           # Bounds concurrent message processing per pod; tuned alongside HPA target
           # so pod-level autoscaling and per-pod throughput scale together.

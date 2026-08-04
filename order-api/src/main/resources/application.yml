@@ -10,9 +10,9 @@ spring:
   cloud:
     gcp:
       project-id: ${GCP_PROJECT_ID:local-dev}
-      pubsub:
-        # In local/test profile the emulator or a stub is used instead of real Pub/Sub.
-        emulator-host: ${PUBSUB_EMULATOR_HOST:}
+      # pubsub.emulator-host is intentionally unset here: only define it (e.g. via
+      # PUBSUB_EMULATOR_HOST) when actually running against the local emulator - an
+      # empty-string default makes spring-cloud-gcp try to dial an empty address.
 
 orderflow:
   pubsub:

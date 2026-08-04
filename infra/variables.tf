@@ -16,8 +16,8 @@ variable "zone" {
 }
 
 variable "cluster_name" {
-  type        = string
-  default     = "orderflow-demo"
+  type    = string
+  default = "orderflow-demo"
 }
 
 variable "github_repo" {

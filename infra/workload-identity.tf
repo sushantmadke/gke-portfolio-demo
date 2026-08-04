@@ -22,8 +22,8 @@ resource "google_pubsub_subscription_iam_member" "workload_subscriber" {
 resource "google_service_account_iam_member" "workload_identity_binding" {
   for_each           = toset(["orderflow-dev", "orderflow-prod"])
   service_account_id = google_service_account.workload.name
-  role                = "roles/iam.workloadIdentityUser"
-  member              = "serviceAccount:${var.project_id}.svc.id.goog[${each.value}/orderflow-workload]"
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "serviceAccount:${var.project_id}.svc.id.goog[${each.value}/orderflow-workload]"
 }
 
 # ---- CI identity: GitHub Actions builds/pushes/deploys as this GSA, no JSON keys ----
@@ -49,11 +49,11 @@ resource "google_artifact_registry_repository_iam_member" "ci_deployer_ar" {
 resource "google_iam_workload_identity_pool" "github" {
   workload_identity_pool_id = "github-actions-pool"
   display_name              = "GitHub Actions"
-  description                = "Federates GitHub Actions OIDC tokens for keyless deploys"
+  description               = "Federates GitHub Actions OIDC tokens for keyless deploys"
 }
 
 resource "google_iam_workload_identity_pool_provider" "github" {
-  workload_identity_pool_id         = google_iam_workload_identity_pool.github.workload_identity_pool_id
+  workload_identity_pool_id          = google_iam_workload_identity_pool.github.workload_identity_pool_id
   workload_identity_pool_provider_id = "github-actions-provider"
   display_name                       = "GitHub Actions OIDC"
 
@@ -74,6 +74,6 @@ resource "google_iam_workload_identity_pool_provider" "github" {
 
 resource "google_service_account_iam_member" "ci_deployer_wif_binding" {
   service_account_id = google_service_account.ci_deployer.name
-  role                = "roles/iam.workloadIdentityUser"
-  member              = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repo}"
+  role               = "roles/iam.workloadIdentityUser"
+  member             = "principalSet://iam.googleapis.com/${google_iam_workload_identity_pool.github.name}/attribute.repository/${var.github_repo}"
 }
