@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-worker
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: order-worker
+    {{- include "orderflow.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicaCount }}
+  selector:
+    matchLabels:
+      app: order-worker
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: order-worker
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: "/actuator/prometheus"
+        prometheus.io/port: "{{ .Values.worker.containerPort }}"
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      # Give in-flight message processing time to finish (ack/nack) before SIGKILL.
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: order-worker
+          image: "{{ include "orderflow.image" . }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.worker.containerPort }}
+          env:
+            - name: GCP_PROJECT_ID
+              value: {{ .Values.pubsub.projectId | quote }}
+            - name: ORDERS_SUBSCRIPTION
+              value: {{ .Values.pubsub.ordersSubscription | quote }}
+          resources:
+            {{- toYaml .Values.worker.resources | nindent 12 }}
+          startupProbe:
+            httpGet:
+              path: /actuator/health
+              port: {{ .Values.worker.containerPort }}
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: {{ .Values.worker.containerPort }}
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: {{ .Values.worker.containerPort }}
+            periodSeconds: 10
+            failureThreshold: 3

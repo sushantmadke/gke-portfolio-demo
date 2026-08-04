@@ -1,0 +1,7 @@
+# Copy to terraform.tfvars (gitignored) and fill in your values.
+project_id   = "your-gcp-project-id"
+region       = "us-central1"
+zone         = "us-central1-a"
+cluster_name = "orderflow-demo"
+github_repo  = "your-github-username/gke-portfolio-demo"
+environment  = "demo"

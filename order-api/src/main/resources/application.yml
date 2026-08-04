@@ -1,0 +1,42 @@
+server:
+  port: 8080
+  shutdown: graceful
+
+spring:
+  application:
+    name: order-api
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  cloud:
+    gcp:
+      project-id: ${GCP_PROJECT_ID:local-dev}
+      pubsub:
+        # In local/test profile the emulator or a stub is used instead of real Pub/Sub.
+        emulator-host: ${PUBSUB_EMULATOR_HOST:}
+
+orderflow:
+  pubsub:
+    orders-topic: ${ORDERS_TOPIC:orders}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"

@@ -1,0 +1,46 @@
+server:
+  port: 8081
+  shutdown: graceful
+
+spring:
+  application:
+    name: order-worker
+  lifecycle:
+    timeout-per-shutdown-phase: 25s
+  cloud:
+    gcp:
+      project-id: ${GCP_PROJECT_ID:local-dev}
+      pubsub:
+        emulator-host: ${PUBSUB_EMULATOR_HOST:}
+        subscriber:
+          # Bounds concurrent message processing per pod; tuned alongside HPA target
+          # so pod-level autoscaling and per-pod throughput scale together.
+          parallel-pull-count: 1
+          executor-threads: 4
+
+orderflow:
+  pubsub:
+    orders-subscription: ${ORDERS_SUBSCRIPTION:orders-worker-sub}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: always
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %-5level [%X{traceId:-},%X{spanId:-}] %logger{36} - %msg%n"

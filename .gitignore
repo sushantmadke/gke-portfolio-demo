@@ -1,0 +1,21 @@
+# Java / Maven
+target/
+*.class
+
+# Terraform
+infra/.terraform/
+infra/*.tfstate
+infra/*.tfstate.*
+infra/*.tfplan
+infra/tfplan
+infra/terraform.tfvars
+infra/.terraform.lock.hcl
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db

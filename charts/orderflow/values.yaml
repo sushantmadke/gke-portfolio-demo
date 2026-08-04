@@ -1,0 +1,71 @@
+# Default values. Environment-specific overrides live in values-dev.yaml / values-prod.yaml,
+# selected at deploy time with `helm upgrade --install -f values-<env>.yaml`.
+
+namespace: orderflow
+
+image:
+  registry: us-central1-docker.pkg.dev
+  project: CHANGE_ME_GCP_PROJECT
+  repository: orderflow
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# Bound to a GCP service account via Workload Identity (see infra/workload-identity.tf).
+# Lets pods call Pub/Sub without mounted JSON key files.
+serviceAccount:
+  name: orderflow-workload
+  gcpServiceAccount: "orderflow-workload@CHANGE_ME_GCP_PROJECT.iam.gserviceaccount.com"
+
+# Kubernetes ServiceAccount that GitHub Actions authenticates as (via Workload Identity
+# Federation) when it runs `helm upgrade`. RBAC below scopes it to only this namespace.
+ciDeployer:
+  gcpServiceAccount: "orderflow-ci-deployer@CHANGE_ME_GCP_PROJECT.iam.gserviceaccount.com"
+
+api:
+  replicaCount: 2
+  containerPort: 8080
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 60
+  service:
+    port: 80
+
+worker:
+  replicaCount: 2
+  containerPort: 8081
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+  autoscaling:
+    minReplicas: 2
+    maxReplicas: 15
+    targetCPUUtilizationPercentage: 70
+
+pubsub:
+  ordersTopic: orders
+  ordersSubscription: orders-worker-sub
+  projectId: CHANGE_ME_GCP_PROJECT
+
+podDisruptionBudget:
+  minAvailable: 1
+
+networkPolicy:
+  enabled: true
+
+resourceQuota:
+  enabled: true
+  requestsCpu: "4"
+  requestsMemory: 8Gi
+  limitsCpu: "8"
+  limitsMemory: 16Gi
+
+limitRange:
+  enabled: true
+  defaultCpu: 250m
+  defaultMemory: 256Mi
+  defaultRequestCpu: 100m
+  defaultRequestMemory: 128Mi

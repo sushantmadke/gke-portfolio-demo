@@ -1,0 +1,130 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main, develop]
+  push:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  id-token: write # required for keyless auth to GCP via Workload Identity Federation
+
+env:
+  REGION: us-central1
+  AR_REPO: orderflow
+
+jobs:
+  test:
+    name: test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [order-api, order-worker]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      - name: mvn test
+        working-directory: ${{ matrix.service }}
+        run: mvn -B -q test
+
+  build-and-push:
+    name: build-and-push (${{ matrix.service }})
+    needs: test
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [order-api, order-worker]
+    outputs:
+      sha: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_CI_DEPLOYER_SA_EMAIL }}
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker ${{ env.REGION }}-docker.pkg.dev --quiet
+
+      - name: Build image
+        working-directory: ${{ matrix.service }}
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/${{ matrix.service }}"
+          docker build -t "$IMAGE:${{ github.sha }}" .
+
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/${{ matrix.service }}:${{ github.sha }}
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Push image
+        run: |
+          IMAGE="${{ env.REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/${{ env.AR_REPO }}/${{ matrix.service }}"
+          docker push "$IMAGE:${{ github.sha }}"
+
+  deploy-dev:
+    name: deploy (dev)
+    needs: build-and-push
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: development
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_CI_DEPLOYER_SA_EMAIL }}
+      - uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ vars.GKE_CLUSTER_NAME }}
+          location: ${{ vars.GKE_ZONE }}
+      - name: helm upgrade --install (dev)
+        run: |
+          helm upgrade --install orderflow ./charts/orderflow \
+            -f charts/orderflow/values-dev.yaml \
+            --set image.tag=${{ github.sha }} \
+            --set image.project=${{ vars.GCP_PROJECT_ID }} \
+            --set pubsub.projectId=${{ vars.GCP_PROJECT_ID }} \
+            --wait --timeout 5m
+
+  deploy-prod:
+    name: deploy (prod)
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    # Requires a manual approval if the "production" GitHub Environment has
+    # protection rules configured - see docs/feedback-mapping.md.
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - name: Authenticate to GCP
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ vars.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GCP_CI_DEPLOYER_SA_EMAIL }}
+      - uses: google-github-actions/get-gke-credentials@v2
+        with:
+          cluster_name: ${{ vars.GKE_CLUSTER_NAME }}
+          location: ${{ vars.GKE_ZONE }}
+      - name: helm upgrade --install (prod)
+        run: |
+          helm upgrade --install orderflow ./charts/orderflow \
+            -f charts/orderflow/values-prod.yaml \
+            --set image.tag=${{ github.sha }} \
+            --set image.project=${{ vars.GCP_PROJECT_ID }} \
+            --set pubsub.projectId=${{ vars.GCP_PROJECT_ID }} \
+            --wait --timeout 5m

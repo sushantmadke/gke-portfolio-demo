@@ -1,0 +1,22 @@
+namespace: orderflow-dev
+
+image:
+  tag: dev
+
+api:
+  replicaCount: 1
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 3
+
+worker:
+  replicaCount: 1
+  autoscaling:
+    minReplicas: 1
+    maxReplicas: 4
+
+resourceQuota:
+  requestsCpu: "2"
+  requestsMemory: 4Gi
+  limitsCpu: "4"
+  limitsMemory: 8Gi

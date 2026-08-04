@@ -1,0 +1,19 @@
+namespace: orderflow-prod
+
+image:
+  tag: stable
+
+api:
+  replicaCount: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 15
+
+worker:
+  replicaCount: 3
+  autoscaling:
+    minReplicas: 3
+    maxReplicas: 25
+
+podDisruptionBudget:
+  minAvailable: 2
